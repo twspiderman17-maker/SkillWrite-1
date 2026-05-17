@@ -59,7 +59,7 @@ function teamPriceFromPerSeat(seats: number, perSeatUsd: number): number {
   return seats * perSeatUsd;
 }
 
-export const TEAM_PLANS: TeamPlan[] = [
+const TEAM_PLAN_DEFS: TeamPlan[] = [
   {
     id: "starter",
     name: "Starter Team",
@@ -120,7 +120,9 @@ export const TEAM_PLANS: TeamPlan[] = [
     perSeatUsd: 20,
     individualEquivalentUsd: 50 * individualSeatUsd("masters", false),
   },
-].map((plan) => ({
+];
+
+export const TEAM_PLANS: TeamPlan[] = TEAM_PLAN_DEFS.map((plan) => ({
   ...plan,
   perSeatUsd: plan.perSeatUsd || Math.round(plan.priceUsd / plan.seats),
 }));

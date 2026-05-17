@@ -30,19 +30,20 @@ export function CheckoutPage() {
   }
 
   const checkoutTrack = track;
+  const checkoutCourse = track.course;
   const checkoutTier = tier;
 
   const item =
     checkoutTier === "certificate"
       ? {
-          title: checkoutTrack.course.certificate.title,
-          price: checkoutTrack.course.certificate.priceUsd,
+          title: checkoutCourse.certificate.title,
+          price: checkoutCourse.certificate.priceUsd,
           description: "Unlock the final test and certificate preview for this course.",
         }
       : {
-          title: `${checkoutTrack.course.plans[checkoutTier].name} course`,
-          price: checkoutTrack.course.plans[checkoutTier].priceUsd,
-          description: checkoutTrack.course.plans[checkoutTier].description,
+          title: `${checkoutCourse.plans[checkoutTier].name} course`,
+          price: checkoutCourse.plans[checkoutTier].priceUsd,
+          description: checkoutCourse.plans[checkoutTier].description,
         };
 
   const alreadyUnlocked = isUnlocked(checkoutTrack.slug, checkoutTier);
