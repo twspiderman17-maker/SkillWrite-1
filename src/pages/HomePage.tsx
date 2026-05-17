@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { TRACKS } from "../data/tracks";
+import { getDemoLessonPath } from "../lib/demoLessons";
 import { SocialProofBanner } from "../components/SocialProofBanner";
 import { TrustSignalsSection } from "../components/TrustSignalsSection";
 import { ForOrganizationsSection } from "../components/ForOrganizationsSection";
@@ -118,14 +119,22 @@ export function HomePage() {
               <p className="mb-4 text-xs font-bold uppercase tracking-widest text-blue-600">{t.shortTitle}</p>
               <h3 className="text-2xl font-bold text-slate-900">{t.title}</h3>
               <p className="mt-4 flex-grow text-sm leading-relaxed text-slate-600">{t.tagline}</p>
-              <div className="mt-8 flex items-center gap-4">
+              <div className="mt-8 flex flex-wrap items-center gap-4">
+                {getDemoLessonPath(t) ? (
+                  <Link
+                    to={getDemoLessonPath(t)!}
+                    className="text-sm font-bold text-emerald-700 transition-colors hover:text-emerald-800"
+                  >
+                    Free preview
+                  </Link>
+                ) : null}
                 <Link
                   to={`/courses/${t.slug}`}
                   className="text-sm font-bold text-slate-900 transition-colors hover:text-blue-600"
                 >
                   Syllabus
                 </Link>
-                <span className="text-slate-300">|</span>
+                <span className="hidden text-slate-300 sm:inline">|</span>
                 <Link
                   to={`/courses/${t.slug}/revise`}
                   className="text-sm font-bold text-slate-500 transition-colors hover:text-blue-600"

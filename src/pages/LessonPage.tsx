@@ -3,6 +3,9 @@ import { useLayoutEffect } from "react";
 import { PaywallCard } from "../components/PaywallCard";
 import { getTrack } from "../data/tracks";
 import { resolveLessonVideo, youtubeLessonEmbedSrc, youtubeWatchUrl } from "../data/lessonVideos";
+import { hasCertificateEarned } from "../lib/certificates";
+import { DemoLessonBanner } from "../components/DemoLessonBanner";
+import { canAccessLesson, getDemoLessonPath, isDemoLesson } from "../lib/demoLessons";
 import { hasLessonAccess, isUnlocked } from "../lib/progress";
 import { guidedLessonMinutes } from "../lib/lessonTime";
 import { adjacentLessons, isLastLessonInProgram } from "../lib/lessonNav";
@@ -155,7 +158,9 @@ export function LessonPage() {
 
   const lessonTrack = track;
   const lessonCourse = track.course;
-  const unlocked = hasLessonAccess(lessonTrack.slug, lesson.program);
+  const purchased = hasLessonAccess(lessonTrack.slug, lesson.program);
+  const unlocked = canAccessLesson(lessonTrack, lesson);
+  const previewOnly = unlocked && !purchased && isDemoLesson(lessonTrack, lesson);
   const plan = lessonCourse.plans[lesson.program];
   const miniTest = lesson.miniTest ?? defaultMiniTest(lesson);
   const guidedMinutes = guidedLessonMinutes(lesson);
@@ -166,6 +171,7 @@ export function LessonPage() {
   const rubric = selfAssessmentRubric(lesson);
   const { prev, next } = adjacentLessons(lessonTrack, lesson.id);
   const certUnlocked = isUnlocked(lessonTrack.slug, "certificate");
+  const certEarned = hasCertificateEarned(lessonTrack.slug);
   const lastInProgram = isLastLessonInProgram(lessonTrack, lesson);
   const handsOnAi = lessonSupportsHandsOnAi(lesson);
 
@@ -182,6 +188,14 @@ export function LessonPage() {
           <p className="text-sm font-bold uppercase tracking-widest text-blue-600">Locked lesson</p>
           <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-slate-900">{lesson.title}</h1>
           <p className="mt-4 text-lg leading-8 text-slate-600">{lesson.description}</p>
+          {getDemoLessonPath(lessonTrack) ? (
+            <Link
+              to={getDemoLessonPath(lessonTrack)!}
+              className="mt-6 inline-flex rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700"
+            >
+              Try the free preview lesson first
+            </Link>
+          ) : null}
         </div>
         <div className="mt-8">
           <AiPracticeCallout variant="compact" showSteps={false} />
@@ -214,12 +228,19 @@ export function LessonPage() {
           <span className="rounded-lg bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-widest text-blue-600">
             {plan.name} · Week {lesson.week}
           </span>
+          {previewOnly ? (
+            <span className="rounded-lg bg-emerald-100 px-3 py-1 text-xs font-bold uppercase tracking-widest text-emerald-800">
+              Free preview
+            </span>
+          ) : null}
           <span className="text-sm font-medium text-slate-500">{guidedMinutes} min guided lesson</span>
           <span className="text-sm font-medium text-slate-500">Video, deep reading, exercises, mini test</span>
         </div>
         <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">{lesson.title}</h1>
         <p className="mt-5 text-xl leading-relaxed text-slate-600">{lesson.description}</p>
       </header>
+
+      {previewOnly ? <DemoLessonBanner track={lessonTrack} program={lesson.program} /> : null}
 
       <div className="mt-8">
         <AiPracticeCallout variant="compact" showSteps={false} />
@@ -405,7 +426,7 @@ export function LessonPage() {
 
       <nav className="mt-14 flex flex-col gap-4 border-t border-slate-200 pt-10 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-3">
-          {prev ? (
+          {prev && canAccessLesson(lessonTrack, prev) ? (
             <Link
               to={`/courses/${lessonTrack.slug}/lessons/${prev.id}`}
               className="inline-flex rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-sm transition-all hover:bg-slate-50"
@@ -417,12 +438,19 @@ export function LessonPage() {
               First lesson
             </span>
           )}
-          {next ? (
+          {next && canAccessLesson(lessonTrack, next) ? (
             <Link
               to={`/courses/${lessonTrack.slug}/lessons/${next.id}`}
               className="inline-flex rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700"
             >
               Next lesson →
+            </Link>
+          ) : next ? (
+            <Link
+              to={`/checkout/${lessonTrack.slug}/${lesson.program}`}
+              className="inline-flex rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700"
+            >
+              Unlock full course →
             </Link>
           ) : (
             <span className="inline-flex rounded-xl border border-dashed border-slate-200 px-5 py-3 text-sm font-medium text-slate-400">
@@ -434,10 +462,20 @@ export function LessonPage() {
           <div className="flex flex-col gap-2 sm:items-end">
             <p className="text-sm font-semibold text-slate-600">End of {plan.name}</p>
             <Link
-              to={certUnlocked ? `/courses/${lessonTrack.slug}/final-test` : `/checkout/${lessonTrack.slug}/certificate`}
+              to={
+                certEarned
+                  ? `/courses/${lessonTrack.slug}/certificate`
+                  : certUnlocked
+                    ? `/courses/${lessonTrack.slug}/final-test`
+                    : `/checkout/${lessonTrack.slug}/certificate`
+              }
               className="text-sm font-bold text-blue-600 hover:text-blue-700"
             >
-              {certUnlocked ? "Open certificate final test" : "Unlock certificate add-on ($5)"}
+              {certEarned
+                ? "View your certificate"
+                : certUnlocked
+                  ? "Take final exam for certificate"
+                  : "Unlock certificate add-on ($5)"}
             </Link>
             <Link to={`/courses/${lessonTrack.slug}`} className="text-sm font-semibold text-slate-500 hover:text-slate-800">
               Back to course home

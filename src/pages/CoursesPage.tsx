@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { TRACKS } from "../data/tracks";
+import { getDemoLessonPath } from "../lib/demoLessons";
 
 export function CoursesPage() {
   return (
@@ -28,6 +29,14 @@ export function CoursesPage() {
               </p>
             </div>
             <div className="flex shrink-0 flex-col justify-center gap-3 sm:w-48">
+              {getDemoLessonPath(t) ? (
+                <Link
+                  to={getDemoLessonPath(t)!}
+                  className="flex w-full items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-all"
+                >
+                  Free preview
+                </Link>
+              ) : null}
               <Link
                 to={`/courses/${t.slug}`}
                 className="flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-all"

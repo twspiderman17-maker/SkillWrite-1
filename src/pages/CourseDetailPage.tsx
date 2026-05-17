@@ -1,11 +1,13 @@
 import { Link, useParams, useLocation } from "react-router-dom";
 import { useEffect, useLayoutEffect, useState } from "react";
+import { getCertificatesEventName, hasCertificateEarned } from "../lib/certificates";
 import { getEntitlementsEventName } from "../lib/entitlements";
 import { PaywallCard } from "../components/PaywallCard";
 import { getTrack } from "../data/tracks";
+import { getDemoLesson, getDemoLessonPath, isDemoLesson } from "../lib/demoLessons";
 import { isUnlocked } from "../lib/progress";
 import { isSupabaseConfigured } from "../lib/supabase";
-import type { CourseLesson, Program } from "../types";
+import type { CourseLesson, Program, Track } from "../types";
 import { guidedLessonMinutes } from "../lib/lessonTime";
 import { compareCourseLessons } from "../lib/lessonNav";
 import { AiPracticeCallout } from "../components/AiPracticeCallout";
@@ -38,21 +40,28 @@ function WeekList({ weeks }: { weeks: { week: number; title: string; bullets: st
 }
 
 function LessonList({
-  trackSlug,
+  track,
   lessons,
-  unlocked,
+  programUnlocked,
 }: {
-  trackSlug: string;
+  track: Track;
   lessons: CourseLesson[];
-  unlocked: boolean;
+  programUnlocked: boolean;
 }) {
   return (
     <div className="space-y-3">
-      {lessons.map((lesson) => (
+      {lessons.map((lesson) => {
+        const demo = isDemoLesson(track, lesson);
+        const badge = demo ? "Free preview" : programUnlocked ? "Unlocked" : "Locked";
+        const badgeClass = demo || programUnlocked ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500";
+
+        return (
         <Link
           key={lesson.id}
-          to={`/courses/${trackSlug}/lessons/${lesson.id}`}
-          className="flex items-start justify-between gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-blue-200 hover:shadow-md"
+          to={`/courses/${track.slug}/lessons/${lesson.id}`}
+          className={`flex items-start justify-between gap-5 rounded-2xl border bg-white p-5 shadow-sm transition-all hover:shadow-md ${
+            demo ? "border-emerald-200 hover:border-emerald-300" : "border-slate-200 hover:border-blue-200"
+          }`}
         >
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -64,15 +73,10 @@ function LessonList({
             <h4 className="mt-3 text-lg font-bold text-slate-900">{lesson.title}</h4>
             <p className="mt-1 text-sm leading-6 text-slate-600">{lesson.description}</p>
           </div>
-          <span
-            className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${
-              unlocked ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
-            }`}
-          >
-            {unlocked ? "Unlocked" : "Locked"}
-          </span>
+          <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-bold ${badgeClass}`}>{badge}</span>
         </Link>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -86,7 +90,11 @@ export function CourseDetailPage() {
   useEffect(() => {
     const refresh = () => setEntitlementVersion((v) => v + 1);
     window.addEventListener(getEntitlementsEventName(), refresh);
-    return () => window.removeEventListener(getEntitlementsEventName(), refresh);
+    window.addEventListener(getCertificatesEventName(), refresh);
+    return () => {
+      window.removeEventListener(getEntitlementsEventName(), refresh);
+      window.removeEventListener(getCertificatesEventName(), refresh);
+    };
   }, []);
 
   useLayoutEffect(() => {
@@ -110,8 +118,21 @@ export function CourseDetailPage() {
   const graduateUnlocked = isUnlocked(track.slug, "graduate");
   const mastersUnlocked = isUnlocked(track.slug, "masters");
   const certificateUnlocked = isUnlocked(track.slug, "certificate");
+  const certificateEarned = hasCertificateEarned(track.slug);
+  const certificateHref = certificateEarned
+    ? `/courses/${track.slug}/certificate`
+    : certificateUnlocked
+      ? `/courses/${track.slug}/final-test`
+      : `/checkout/${track.slug}/certificate`;
+  const certificateLabel = certificateEarned
+    ? "View your certificate"
+    : certificateUnlocked
+      ? "Take final test"
+      : "Unlock certificate";
   const lessonsByProgram = (program: Program) =>
     [...(course?.lessons.filter((lesson) => lesson.program === program) ?? [])].sort(compareCourseLessons);
+  const demoLesson = getDemoLesson(track);
+  const demoLessonHref = getDemoLessonPath(track);
 
   return (
     <div className="mx-auto max-w-4xl pb-24">
@@ -124,6 +145,14 @@ export function CourseDetailPage() {
         </h1>
         <p className="mt-6 text-xl leading-relaxed text-slate-600">{track.tagline}</p>
         <div className="mt-8 flex flex-wrap items-center gap-4">
+          {demoLessonHref ? (
+            <Link
+              to={demoLessonHref}
+              className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-all"
+            >
+              Try free lesson
+            </Link>
+          ) : null}
           <Link
             to={`/courses/${track.slug}/revise`}
             className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-blue-700 transition-all"
@@ -137,6 +166,12 @@ export function CourseDetailPage() {
             Certificate Pathway
           </Link>
         </div>
+        {demoLesson ? (
+          <p className="mt-4 text-sm text-slate-600">
+            Preview <span className="font-semibold text-slate-800">{demoLesson.title}</span> before you buy — full video,
+            exercises, and mini quiz included.
+          </p>
+        ) : null}
       </div>
 
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 mb-16 flex gap-4">
@@ -190,7 +225,7 @@ export function CourseDetailPage() {
                 title="Final test + certificate"
                 priceUsd={course.certificate.priceUsd}
                 description={course.certificate.description}
-                includes={["Final practical test", "Checklist-based marking", "Certificate preview after submission"]}
+                includes={["Auto-marked final exam", "Scenario-based questions", "Printable certificate when you pass"]}
                 unlocked={certificateUnlocked}
                 ctaLabel={`Add certificate for $${course.certificate.priceUsd}`}
               />
@@ -203,13 +238,17 @@ export function CourseDetailPage() {
                 <h2 className="text-3xl font-bold text-slate-900">Graduate lessons</h2>
                 <p className="mt-2 text-slate-600">Three lessons per week across the 4-week Graduate course.</p>
               </div>
-              {graduateUnlocked && (
+              {graduateUnlocked ? (
                 <Link to={`/courses/${track.slug}/lessons/${lessonsByProgram("graduate")[0]?.id}`} className="text-sm font-bold text-blue-600">
                   Start Graduate &rarr;
                 </Link>
-              )}
+              ) : demoLessonHref ? (
+                <Link to={demoLessonHref} className="text-sm font-bold text-emerald-700">
+                  Try free lesson &rarr;
+                </Link>
+              ) : null}
             </div>
-            <LessonList trackSlug={track.slug} lessons={lessonsByProgram("graduate")} unlocked={graduateUnlocked} />
+            <LessonList track={track} lessons={lessonsByProgram("graduate")} programUnlocked={graduateUnlocked} />
           </section>
 
           <section>
@@ -224,7 +263,7 @@ export function CourseDetailPage() {
                 </Link>
               )}
             </div>
-            <LessonList trackSlug={track.slug} lessons={lessonsByProgram("masters")} unlocked={mastersUnlocked} />
+            <LessonList track={track} lessons={lessonsByProgram("masters")} programUnlocked={mastersUnlocked} />
           </section>
 
           <section className="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
@@ -235,10 +274,10 @@ export function CourseDetailPage() {
                 <p className="mt-2 max-w-2xl text-slate-600">{course.certificate.description}</p>
               </div>
               <Link
-                to={certificateUnlocked ? `/courses/${track.slug}/final-test` : `/checkout/${track.slug}/certificate`}
+                to={certificateHref}
                 className="shrink-0 rounded-xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-slate-800"
               >
-                {certificateUnlocked ? "Open final test" : "Unlock certificate"}
+                {certificateLabel}
               </Link>
             </div>
           </section>
