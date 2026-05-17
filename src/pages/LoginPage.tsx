@@ -141,8 +141,8 @@ export function LoginPage() {
               </li>
             </ul>
             <p className="mt-3">
-              Vercel → project <strong>skillwrite13</strong> → Settings → Environment Variables → check{" "}
-              <strong>Production</strong> → Deployments → Redeploy (uncheck “Use existing build cache” if offered).
+              Vercel → your project → Settings → Environment Variables → check <strong>Production</strong> →
+              Deployments → Redeploy (uncheck “Use existing build cache” if offered).
             </p>
           </div>
         )}

@@ -29,6 +29,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    // Set Supabase secret SITE_URL=https://skillwrite.org for production Stripe redirects.
     const siteUrl = Deno.env.get("SITE_URL") ?? "http://localhost:5173";
     if (!stripeKey) {
       return json({ error: "Stripe is not configured on the server." }, 500);
