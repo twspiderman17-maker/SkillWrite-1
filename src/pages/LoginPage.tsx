@@ -97,7 +97,7 @@ export function LoginPage() {
     setError("");
     setInfo("");
     try {
-      await signInWithGoogle(redirectTo);
+      await signInWithGoogle();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed.");
       setBusy(false);

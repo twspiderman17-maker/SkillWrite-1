@@ -147,13 +147,18 @@ export async function signUpWithEmail(
   });
   if (error) throw error;
   if (!data.user) throw new Error("Sign up failed.");
+  if (!data.session) {
+    throw new Error(
+      "Account created. Check your email for a confirmation link, then sign in here.",
+    );
+  }
   cachedUser = mapUser(data.user);
   notifyAuthChange();
   await refreshEntitlements();
   return cachedUser;
 }
 
-export async function signInWithGoogle(): Promise<void> {
+export async function signInWithGoogle(postLoginPath = "/courses"): Promise<void> {
   if (!isSupabaseConfigured || !supabase) {
     const user: AuthUser = {
       id: "demo_google",
@@ -167,10 +172,19 @@ export async function signInWithGoogle(): Promise<void> {
     return;
   }
 
-  const redirectTo = `${window.location.origin}/login`;
+  const params = new URLSearchParams();
+  if (postLoginPath && postLoginPath !== "/courses") {
+    params.set("redirect", postLoginPath);
+  }
+  const query = params.toString();
+  const redirectTo = `${window.location.origin}/login${query ? `?${query}` : ""}`;
+
   const { error } = await supabase.auth.signInWithOAuth({
     provider: "google",
-    options: { redirectTo },
+    options: {
+      redirectTo,
+      skipBrowserRedirect: false,
+    },
   });
   if (error) throw error;
 }
