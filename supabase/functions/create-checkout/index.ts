@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import { corsHeaders } from "../_shared/cors.ts";
+import { resolveSiteUrl } from "../_shared/site-url.ts";
 import {
   individualAmountCents,
   individualProductName,
@@ -19,6 +20,8 @@ type Body = {
   orgName?: string;
   successPath?: string;
   cancelPath?: string;
+  /** Browser origin where checkout started (e.g. https://skillwrite.org). */
+  returnOrigin?: string;
 };
 
 function normalizeSecret(value: string | undefined): string | undefined {
@@ -97,7 +100,12 @@ Deno.serve(async (req: Request) => {
 
   try {
     const stripeKey = normalizeSecret(Deno.env.get("STRIPE_SECRET_KEY"));
-    const siteUrl = (normalizeSecret(Deno.env.get("SITE_URL")) ?? "http://localhost:5173").replace(/\/$/, "");
+    const body = (await req.json()) as Body;
+    const siteUrl = resolveSiteUrl({
+      envSiteUrl: normalizeSecret(Deno.env.get("SITE_URL")),
+      returnOrigin: body.returnOrigin,
+      requestOrigin: req.headers.get("Origin"),
+    });
 
     if (!stripeKey) {
       return json({ error: "Stripe is not configured on the server (STRIPE_SECRET_KEY missing)." }, 500);
@@ -137,7 +145,6 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Invalid session. Sign out and sign in again." }, 401);
     }
 
-    const body = (await req.json()) as Body;
     const successPath = body.successPath ?? "/courses";
     const cancelPath = body.cancelPath ?? "/pricing";
 

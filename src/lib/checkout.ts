@@ -42,7 +42,9 @@ export async function startStripeCheckout(args: IndividualCheckout | TeamCheckou
     throw new Error("Sign in required.");
   }
 
-  const { data, error } = await supabase.functions.invoke("create-checkout", { body: args });
+  const { data, error } = await supabase.functions.invoke("create-checkout", {
+    body: { ...args, returnOrigin: window.location.origin },
+  });
   if (error) {
     throw new Error(await readFunctionError(error));
   }
