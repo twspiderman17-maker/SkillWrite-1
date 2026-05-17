@@ -66,7 +66,7 @@ const INSURANCE_COURSE: PaidCourse = {
       { label: "Job fit", passCriteria: "The result would be useful to a claims handler or FNOL team." },
     ],
   },
-  lessons: allocateLessonVideos([
+  lessons: allocateLessonVideos(([
     {
       id: "g1-ai-basics-for-claims",
       program: "graduate",
@@ -852,7 +852,7 @@ const INSURANCE_COURSE: PaidCourse = {
         "Run a final self-review and improve one weak part before opening the certificate test.",
     },
     ...buildExpandedInsuranceLessons(),
-  ].map(stripVideoFields)),
+  ] as CourseLesson[]).map(stripVideoFields)),
 };
 
 const { construction: CONSTRUCTION_COURSE, clinical: CLINICAL_COURSE, accounting: ACCOUNTING_COURSE } =

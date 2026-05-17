@@ -29,29 +29,32 @@ export function CheckoutPage() {
     );
   }
 
+  const checkoutTrack = track;
+  const checkoutTier = tier;
+
   const item =
-    tier === "certificate"
+    checkoutTier === "certificate"
       ? {
-          title: track.course.certificate.title,
-          price: track.course.certificate.priceUsd,
+          title: checkoutTrack.course.certificate.title,
+          price: checkoutTrack.course.certificate.priceUsd,
           description: "Unlock the final test and certificate preview for this course.",
         }
       : {
-          title: `${track.course.plans[tier].name} course`,
-          price: track.course.plans[tier].priceUsd,
-          description: track.course.plans[tier].description,
+          title: `${checkoutTrack.course.plans[checkoutTier].name} course`,
+          price: checkoutTrack.course.plans[checkoutTier].priceUsd,
+          description: checkoutTrack.course.plans[checkoutTier].description,
         };
 
-  const alreadyUnlocked = isUnlocked(track.slug, tier);
+  const alreadyUnlocked = isUnlocked(checkoutTrack.slug, checkoutTier);
   const user = getCurrentUser();
   const production = isSupabaseConfigured;
 
   function completeDemoCheckout() {
-    unlockPurchase(track.slug, tier);
-    if (tier === "certificate") {
-      navigate(`/courses/${track.slug}/final-test`);
+    unlockPurchase(checkoutTrack.slug, checkoutTier);
+    if (checkoutTier === "certificate") {
+      navigate(`/courses/${checkoutTrack.slug}/final-test`);
     } else {
-      navigate(`/courses/${track.slug}`);
+      navigate(`/courses/${checkoutTrack.slug}`);
     }
   }
 
@@ -67,7 +70,7 @@ export function CheckoutPage() {
     }
 
     if (!user) {
-      navigate(`/login?redirect=/checkout/${track.slug}/${tier}`);
+      navigate(`/login?redirect=/checkout/${checkoutTrack.slug}/${checkoutTier}`);
       return;
     }
 
@@ -76,11 +79,13 @@ export function CheckoutPage() {
     try {
       await startStripeCheckout({
         type: "individual",
-        trackSlug: track.slug,
-        tier,
+        trackSlug: checkoutTrack.slug,
+        tier: checkoutTier,
         successPath:
-          tier === "certificate" ? `/courses/${track.slug}/final-test` : `/courses/${track.slug}`,
-        cancelPath: `/checkout/${track.slug}/${tier}`,
+          checkoutTier === "certificate"
+            ? `/courses/${checkoutTrack.slug}/final-test`
+            : `/courses/${checkoutTrack.slug}`,
+        cancelPath: `/checkout/${checkoutTrack.slug}/${checkoutTier}`,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed.");
@@ -91,7 +96,7 @@ export function CheckoutPage() {
   return (
     <div className="mx-auto max-w-3xl pb-24 pt-10">
       <Link
-        to={`/courses/${track.slug}`}
+        to={`/courses/${checkoutTrack.slug}`}
         className="text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900"
       >
         &larr; Back to course
@@ -135,7 +140,10 @@ export function CheckoutPage() {
                 </>
               ) : (
                 <>
-                  <Link to={`/login?redirect=/checkout/${track.slug}/${tier}`} className="font-semibold text-blue-600">
+                  <Link
+                    to={`/login?redirect=/checkout/${checkoutTrack.slug}/${checkoutTier}`}
+                    className="font-semibold text-blue-600"
+                  >
                     Sign in
                   </Link>{" "}
                   before checkout so your purchase is saved to your account.

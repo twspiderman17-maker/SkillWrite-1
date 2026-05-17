@@ -20,18 +20,19 @@ export function FinalTestPage() {
     );
   }
 
-  const certificate = track.course.certificate;
-  const unlocked = isUnlocked(track.slug, "certificate");
+  const activeTrack = track;
+  const certificate = activeTrack.course.certificate;
+  const unlocked = isUnlocked(activeTrack.slug, "certificate");
 
   function submitDemoTest() {
-    recordFinalTestSubmission(track.slug);
+    recordFinalTestSubmission(activeTrack.slug);
     setSubmitted(true);
   }
 
   if (!unlocked) {
     return (
       <div className="mx-auto max-w-4xl pb-24 pt-10">
-        <Link to={`/courses/${track.slug}`} className="text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900">
+        <Link to={`/courses/${activeTrack.slug}`} className="text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900">
           &larr; Back to course
         </Link>
         <div className="mt-8 rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
@@ -41,7 +42,7 @@ export function FinalTestPage() {
         </div>
         <div className="mt-8 max-w-xl">
           <PaywallCard
-            trackSlug={track.slug}
+            trackSlug={activeTrack.slug}
             tier="certificate"
             title="Final test + certificate"
             priceUsd={certificate.priceUsd}
@@ -55,7 +56,7 @@ export function FinalTestPage() {
 
   return (
     <div className="mx-auto max-w-4xl pb-24 pt-8">
-      <Link to={`/courses/${track.slug}`} className="text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900">
+      <Link to={`/courses/${activeTrack.slug}`} className="text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900">
         &larr; Back to course
       </Link>
 
@@ -74,7 +75,7 @@ export function FinalTestPage() {
             <p className="text-sm font-semibold uppercase tracking-widest text-slate-400">SkillWrite certifies that</p>
             <p className="mt-5 text-4xl font-extrabold tracking-tight text-slate-900">Demo Learner</p>
             <p className="mx-auto mt-5 max-w-xl text-lg leading-8 text-slate-600">
-              completed the practical final test for <strong>{track.title}</strong> and demonstrated safe, job-specific AI workflow skills.
+              completed the practical final test for <strong>{activeTrack.title}</strong> and demonstrated safe, job-specific AI workflow skills.
             </p>
             <p className="mt-8 text-sm font-semibold text-emerald-700">Submitted in demo mode</p>
           </div>

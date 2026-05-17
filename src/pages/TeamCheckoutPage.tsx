@@ -29,7 +29,8 @@ export function TeamCheckoutPage() {
     );
   }
 
-  const needsTrackPick = plan.id === "starter";
+  const teamPlan = plan;
+  const needsTrackPick = teamPlan.id === "starter";
   const production = isSupabaseConfigured;
   const user = getCurrentUser();
 
@@ -38,13 +39,13 @@ export function TeamCheckoutPage() {
     if (!agreed) return;
 
     if (!production) {
-      activateTeamPlan(plan, orgName, needsTrackPick ? trackSlug : undefined);
+      activateTeamPlan(teamPlan, orgName, needsTrackPick ? trackSlug : undefined);
       navigate("/teams", { replace: true });
       return;
     }
 
     if (!user) {
-      navigate(`/login?redirect=/teams/checkout/${plan.id}`);
+      navigate(`/login?redirect=/teams/checkout/${teamPlan.id}`);
       return;
     }
 
@@ -53,11 +54,11 @@ export function TeamCheckoutPage() {
     try {
       await startStripeCheckout({
         type: "team",
-        teamPlanId: plan.id,
+        teamPlanId: teamPlan.id,
         orgName,
         trackSlugForTeam: needsTrackPick ? trackSlug : undefined,
         successPath: "/teams",
-        cancelPath: `/teams/checkout/${plan.id}`,
+        cancelPath: `/teams/checkout/${teamPlan.id}`,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Checkout failed.");
@@ -76,9 +77,9 @@ export function TeamCheckoutPage() {
           <p className="text-xs font-bold uppercase tracking-widest text-blue-600">
             {production ? "Team checkout" : "Demo team checkout"}
           </p>
-          <h1 className="mt-2 text-3xl font-extrabold text-slate-900">{plan.name}</h1>
+          <h1 className="mt-2 text-3xl font-extrabold text-slate-900">{teamPlan.name}</h1>
           <p className="mt-2 text-slate-600">
-            ${plan.priceUsd} {plan.billingLabel} · {plan.seatLabel}
+            ${teamPlan.priceUsd} {teamPlan.billingLabel} · {teamPlan.seatLabel}
           </p>
         </div>
 
@@ -102,7 +103,7 @@ export function TeamCheckoutPage() {
 
           {!user && production && (
             <p className="text-sm text-slate-600">
-              <Link to={`/login?redirect=/teams/checkout/${plan.id}`} className="font-semibold text-blue-600">
+              <Link to={`/login?redirect=/teams/checkout/${teamPlan.id}`} className="font-semibold text-blue-600">
                 Sign in
               </Link>{" "}
               to continue.
@@ -167,8 +168,8 @@ export function TeamCheckoutPage() {
             {busy
               ? "Redirecting…"
               : production
-                ? `Pay $${plan.priceUsd} with Stripe`
-                : `Activate ${plan.name} — $${plan.priceUsd} demo`}
+                ? `Pay $${teamPlan.priceUsd} with Stripe`
+                : `Activate ${teamPlan.name} — $${teamPlan.priceUsd} demo`}
           </button>
         </form>
       </div>
