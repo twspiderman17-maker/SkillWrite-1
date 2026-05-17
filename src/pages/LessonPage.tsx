@@ -153,8 +153,10 @@ export function LessonPage() {
     );
   }
 
-  const unlocked = hasLessonAccess(track.slug, lesson.program);
-  const plan = track.course.plans[lesson.program];
+  const lessonTrack = track;
+  const lessonCourse = track.course;
+  const unlocked = hasLessonAccess(lessonTrack.slug, lesson.program);
+  const plan = lessonCourse.plans[lesson.program];
   const miniTest = lesson.miniTest ?? defaultMiniTest(lesson);
   const guidedMinutes = guidedLessonMinutes(lesson);
   const studyPlan = getStudyPlan(lesson);
@@ -162,16 +164,16 @@ export function LessonPage() {
   const video = resolveLessonVideo(lesson);
   const reading = extendedReading(lesson);
   const rubric = selfAssessmentRubric(lesson);
-  const { prev, next } = adjacentLessons(track, lesson.id);
-  const certUnlocked = isUnlocked(track.slug, "certificate");
-  const lastInProgram = isLastLessonInProgram(track, lesson);
+  const { prev, next } = adjacentLessons(lessonTrack, lesson.id);
+  const certUnlocked = isUnlocked(lessonTrack.slug, "certificate");
+  const lastInProgram = isLastLessonInProgram(lessonTrack, lesson);
   const handsOnAi = lessonSupportsHandsOnAi(lesson);
 
   if (!unlocked) {
     return (
       <div className="mx-auto max-w-4xl pb-24 pt-10">
         <Link
-          to={`/courses/${track.slug}`}
+          to={`/courses/${lessonTrack.slug}`}
           className="text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900"
         >
           &larr; Back to course
@@ -186,7 +188,7 @@ export function LessonPage() {
         </div>
         <div className="mt-8 max-w-xl">
           <PaywallCard
-            trackSlug={track.slug}
+            trackSlug={lessonTrack.slug}
             tier={lesson.program}
             title={`${plan.name} / ${plan.durationLabel}`}
             priceUsd={plan.priceUsd}
@@ -201,10 +203,10 @@ export function LessonPage() {
   return (
     <article className="mx-auto max-w-4xl pb-24 pt-8">
       <Link
-        to={`/courses/${track.slug}`}
+        to={`/courses/${lessonTrack.slug}`}
         className="text-sm font-semibold text-slate-500 transition-colors hover:text-slate-900"
       >
-        &larr; {track.shortTitle} course
+        &larr; {lessonTrack.shortTitle} course
       </Link>
 
       <header className="mt-8 border-b border-slate-200 pb-10">
@@ -389,7 +391,7 @@ export function LessonPage() {
             source notes visible side-by-side with the model output so fact-checking is fast and honest.
           </div>
           <Link
-            to={`/courses/${track.slug}/revise`}
+            to={`/courses/${lessonTrack.slug}/revise`}
             className="mt-6 inline-flex rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-sm transition-all hover:bg-slate-50"
           >
             Open revision lab
@@ -398,14 +400,14 @@ export function LessonPage() {
       </section>
 
       <section className="mt-10">
-        <MiniQuiz trackSlug={`${track.slug}-${lesson.id}`} questions={miniTest} />
+        <MiniQuiz trackSlug={`${lessonTrack.slug}-${lesson.id}`} questions={miniTest} />
       </section>
 
       <nav className="mt-14 flex flex-col gap-4 border-t border-slate-200 pt-10 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-3">
           {prev ? (
             <Link
-              to={`/courses/${track.slug}/lessons/${prev.id}`}
+              to={`/courses/${lessonTrack.slug}/lessons/${prev.id}`}
               className="inline-flex rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-900 shadow-sm transition-all hover:bg-slate-50"
             >
               ← Previous lesson
@@ -417,7 +419,7 @@ export function LessonPage() {
           )}
           {next ? (
             <Link
-              to={`/courses/${track.slug}/lessons/${next.id}`}
+              to={`/courses/${lessonTrack.slug}/lessons/${next.id}`}
               className="inline-flex rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700"
             >
               Next lesson →
@@ -432,17 +434,17 @@ export function LessonPage() {
           <div className="flex flex-col gap-2 sm:items-end">
             <p className="text-sm font-semibold text-slate-600">End of {plan.name}</p>
             <Link
-              to={certUnlocked ? `/courses/${track.slug}/final-test` : `/checkout/${track.slug}/certificate`}
+              to={certUnlocked ? `/courses/${lessonTrack.slug}/final-test` : `/checkout/${lessonTrack.slug}/certificate`}
               className="text-sm font-bold text-blue-600 hover:text-blue-700"
             >
               {certUnlocked ? "Open certificate final test" : "Unlock certificate add-on ($5)"}
             </Link>
-            <Link to={`/courses/${track.slug}`} className="text-sm font-semibold text-slate-500 hover:text-slate-800">
+            <Link to={`/courses/${lessonTrack.slug}`} className="text-sm font-semibold text-slate-500 hover:text-slate-800">
               Back to course home
             </Link>
           </div>
         ) : (
-          <Link to={`/courses/${track.slug}`} className="text-sm font-semibold text-slate-500 hover:text-slate-800 sm:text-right">
+          <Link to={`/courses/${lessonTrack.slug}`} className="text-sm font-semibold text-slate-500 hover:text-slate-800 sm:text-right">
             Course home
           </Link>
         )}

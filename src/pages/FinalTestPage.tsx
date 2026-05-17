@@ -21,7 +21,8 @@ export function FinalTestPage() {
   }
 
   const activeTrack = track;
-  const certificate = activeTrack.course.certificate;
+  const activeCourse = track.course;
+  const certificate = activeCourse.certificate;
   const unlocked = isUnlocked(activeTrack.slug, "certificate");
 
   function submitDemoTest() {
