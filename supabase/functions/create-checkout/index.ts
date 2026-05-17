@@ -22,17 +22,54 @@ type Body = {
   cancelPath?: string;
 };
 
+function normalizeSecret(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
+function stripeErrorMessage(error: unknown): string {
+  if (error instanceof Stripe.errors.StripeError) {
+    return error.message;
+  }
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return "Checkout failed.";
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-    // Set Supabase secret SITE_URL=https://skillwrite.org for production Stripe redirects.
-    const siteUrl = Deno.env.get("SITE_URL") ?? "http://localhost:5173";
+    const stripeKey = normalizeSecret(Deno.env.get("STRIPE_SECRET_KEY"));
+    const siteUrl = (normalizeSecret(Deno.env.get("SITE_URL")) ?? "http://localhost:5173").replace(/\/$/, "");
+
     if (!stripeKey) {
-      return json({ error: "Stripe is not configured on the server." }, 500);
+      return json({ error: "Stripe is not configured on the server (STRIPE_SECRET_KEY missing)." }, 500);
+    }
+    if (stripeKey.startsWith("pk_")) {
+      return json(
+        {
+          error:
+            "STRIPE_SECRET_KEY is a publishable key (pk_). Use the secret key (sk_test_ or sk_live_) from Stripe → API keys.",
+        },
+        500,
+      );
+    }
+    if (!stripeKey.startsWith("sk_")) {
+      return json(
+        { error: "STRIPE_SECRET_KEY must start with sk_test_ or sk_live_ (Stripe secret key)." },
+        500,
+      );
     }
 
     const authHeader = req.headers.get("Authorization");
@@ -51,7 +88,7 @@ Deno.serve(async (req: Request) => {
       error: userError,
     } = await supabase.auth.getUser();
     if (userError || !user) {
-      return json({ error: "Invalid session." }, 401);
+      return json({ error: "Invalid session. Sign out and sign in again." }, 401);
     }
 
     const body = (await req.json()) as Body;
@@ -115,10 +152,14 @@ Deno.serve(async (req: Request) => {
       metadata,
     });
 
+    if (!session.url) {
+      return json({ error: "Stripe did not return a checkout URL." }, 500);
+    }
+
     return json({ url: session.url });
   } catch (e) {
-    console.error(e);
-    return json({ error: e instanceof Error ? e.message : "Checkout failed." }, 500);
+    console.error("create-checkout error:", e);
+    return json({ error: stripeErrorMessage(e) }, 500);
   }
 });
 
