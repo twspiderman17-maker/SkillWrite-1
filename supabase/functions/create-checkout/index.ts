@@ -1,6 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import Stripe from "npm:stripe@17.7.0";
 import { corsHeaders } from "../_shared/cors.ts";
 import {
   individualAmountCents,
@@ -34,19 +33,66 @@ function normalizeSecret(value: string | undefined): string | undefined {
   return trimmed;
 }
 
-function stripeErrorMessage(error: unknown): string {
-  if (error instanceof Stripe.errors.StripeError) {
-    return error.message;
+function addFormValue(form: URLSearchParams, key: string, value: string | number | undefined) {
+  if (value === undefined || value === "") return;
+  form.append(key, String(value));
+}
+
+async function createStripeCheckoutSession(
+  stripeKey: string,
+  params: {
+    productName: string;
+    amountCents: number;
+    successUrl: string;
+    cancelUrl: string;
+    userId: string;
+    customerEmail?: string;
+    metadata: Record<string, string>;
+  },
+): Promise<string> {
+  const form = new URLSearchParams();
+  addFormValue(form, "mode", "payment");
+  addFormValue(form, "line_items[0][quantity]", 1);
+  addFormValue(form, "line_items[0][price_data][currency]", "usd");
+  addFormValue(form, "line_items[0][price_data][unit_amount]", params.amountCents);
+  addFormValue(form, "line_items[0][price_data][product_data][name]", params.productName);
+  addFormValue(form, "success_url", params.successUrl);
+  addFormValue(form, "cancel_url", params.cancelUrl);
+  addFormValue(form, "client_reference_id", params.userId);
+  addFormValue(form, "customer_email", params.customerEmail);
+
+  for (const [key, value] of Object.entries(params.metadata)) {
+    addFormValue(form, `metadata[${key}]`, value);
   }
-  if (error instanceof Error) {
-    return error.message;
+
+  const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${stripeKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Stripe-Version": "2026-04-22.dahlia",
+    },
+    body: form,
+  });
+
+  const payload = await response.json().catch(() => null) as { url?: string; error?: { message?: string } } | null;
+
+  if (!response.ok) {
+    throw new Error(payload?.error?.message ?? "Stripe checkout failed.");
   }
-  return "Checkout failed.";
+  if (!payload?.url) {
+    throw new Error("Stripe did not return a checkout URL.");
+  }
+
+  return payload.url;
 }
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
+  }
+  if (req.method !== "POST") {
+    return json({ error: "Method not allowed." }, 405);
   }
 
   try {
@@ -60,14 +106,14 @@ Deno.serve(async (req: Request) => {
       return json(
         {
           error:
-            "STRIPE_SECRET_KEY is a publishable key (pk_). Use the secret key (sk_test_ or sk_live_) from Stripe → API keys.",
+            "STRIPE_SECRET_KEY is a publishable key (pk_). Use a Stripe secret key (sk_) or restricted key (rk_) with Checkout Sessions write access.",
         },
         500,
       );
     }
-    if (!stripeKey.startsWith("sk_")) {
+    if (!stripeKey.startsWith("sk_") && !stripeKey.startsWith("rk_")) {
       return json(
-        { error: "STRIPE_SECRET_KEY must start with sk_test_ or sk_live_ (Stripe secret key)." },
+        { error: "STRIPE_SECRET_KEY must start with sk_ or rk_ (Stripe server-side key)." },
         500,
       );
     }
@@ -95,9 +141,8 @@ Deno.serve(async (req: Request) => {
     const successPath = body.successPath ?? "/courses";
     const cancelPath = body.cancelPath ?? "/pricing";
 
-    const stripe = new Stripe(stripeKey, { apiVersion: "2025-02-24.acacia" });
-
-    let lineItem: Stripe.Checkout.SessionCreateParams.LineItem;
+    let productName: string;
+    let amountCents: number;
     let metadata: Record<string, string>;
 
     if (body.type === "team") {
@@ -105,14 +150,8 @@ Deno.serve(async (req: Request) => {
       if (!planId || !["starter", "growth", "department"].includes(planId)) {
         return json({ error: "Invalid team plan." }, 400);
       }
-      lineItem = {
-        quantity: 1,
-        price_data: {
-          currency: "usd",
-          unit_amount: teamAmountCents(planId),
-          product_data: { name: teamProductName(planId) },
-        },
-      };
+      productName = teamProductName(planId);
+      amountCents = teamAmountCents(planId);
       metadata = {
         user_id: user.id,
         purchase_type: "team",
@@ -126,14 +165,8 @@ Deno.serve(async (req: Request) => {
       if (!tier || !trackSlug || !["graduate", "masters", "certificate"].includes(tier)) {
         return json({ error: "Invalid course or tier." }, 400);
       }
-      lineItem = {
-        quantity: 1,
-        price_data: {
-          currency: "usd",
-          unit_amount: individualAmountCents(tier),
-          product_data: { name: individualProductName(trackSlug, tier) },
-        },
-      };
+      productName = individualProductName(trackSlug, tier);
+      amountCents = individualAmountCents(tier);
       metadata = {
         user_id: user.id,
         purchase_type: "individual",
@@ -142,24 +175,20 @@ Deno.serve(async (req: Request) => {
       };
     }
 
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: [lineItem],
-      success_url: `${siteUrl}${successPath}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}${cancelPath}?checkout=cancelled`,
-      client_reference_id: user.id,
-      customer_email: user.email ?? undefined,
+    const url = await createStripeCheckoutSession(stripeKey, {
+      productName,
+      amountCents,
+      successUrl: `${siteUrl}${successPath}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${siteUrl}${cancelPath}?checkout=cancelled`,
+      userId: user.id,
+      customerEmail: user.email ?? undefined,
       metadata,
     });
 
-    if (!session.url) {
-      return json({ error: "Stripe did not return a checkout URL." }, 500);
-    }
-
-    return json({ url: session.url });
+    return json({ url });
   } catch (e) {
     console.error("create-checkout error:", e);
-    return json({ error: stripeErrorMessage(e) }, 500);
+    return json({ error: e instanceof Error ? e.message : "Checkout failed." }, 500);
   }
 });
 
