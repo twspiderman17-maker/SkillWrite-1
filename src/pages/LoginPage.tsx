@@ -1,22 +1,61 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { signInWithEmail, signInWithGoogle, signUpWithEmail } from "../lib/auth";
-import { isSupabaseConfigured } from "../lib/supabase";
+import { getSupabaseConfigStatus, isSupabaseConfigured, supabase } from "../lib/supabase";
+
+function readOAuthErrorFromUrl(): string | null {
+  const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : "";
+  const hashParams = new URLSearchParams(hash);
+  const queryParams = new URLSearchParams(window.location.search);
+  const raw =
+    hashParams.get("error_description") ||
+    hashParams.get("error") ||
+    queryParams.get("error_description") ||
+    queryParams.get("error");
+  if (!raw) return null;
+  return decodeURIComponent(raw.replace(/\+/g, " "));
+}
 
 export function LoginPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
+  const supabaseStatus = getSupabaseConfigStatus();
   const redirectTo = params.get("redirect") || "/courses";
   const [mode, setMode] = useState<"login" | "create">("login");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function complete() {
-    navigate(redirectTo);
+    navigate(redirectTo, { replace: true });
   }
+
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase) return;
+
+    const oauthError = readOAuthErrorFromUrl();
+    if (oauthError) {
+      setError(oauthError);
+      window.history.replaceState({}, "", `${window.location.pathname}${window.location.search}`);
+    }
+
+    void supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) void complete();
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && event === "SIGNED_IN") {
+        void complete();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [redirectTo]);
 
   async function handleEmailSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -31,15 +70,23 @@ export function LoginPage() {
 
     setBusy(true);
     setError("");
+    setInfo("");
     try {
       if (mode === "create") {
         await signUpWithEmail(email, password, name);
+        await complete();
       } else {
         await signInWithEmail(email, password);
+        await complete();
       }
-      await complete();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not sign in.");
+      const message = err instanceof Error ? err.message : "Could not sign in.";
+      if (message.toLowerCase().includes("confirmation")) {
+        setInfo(message);
+        setError("");
+      } else {
+        setError(message);
+      }
     } finally {
       setBusy(false);
     }
@@ -48,11 +95,9 @@ export function LoginPage() {
   async function handleGoogle() {
     setBusy(true);
     setError("");
+    setInfo("");
     try {
-      await signInWithGoogle();
-      if (!isSupabaseConfigured) {
-        await complete();
-      }
+      await signInWithGoogle(redirectTo);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Google sign-in failed.");
       setBusy(false);
@@ -69,9 +114,36 @@ export function LoginPage() {
             ? "Sign in to unlock paid tracks. Purchases are tied to your account and enforced server-side."
             : "Demo mode: accounts and unlocks stay in this browser until Supabase env vars are configured."}
         </p>
+        {isSupabaseConfigured && supabaseStatus.usesDefaults && (
+          <div className="mt-8 rounded-2xl border border-blue-200 bg-blue-50 p-5 text-sm leading-6 text-blue-900">
+            <p className="font-bold">Supabase connected (built-in publishable keys).</p>
+            <p className="mt-2">
+              Optional: add <code className="rounded bg-blue-100 px-1">VITE_SUPABASE_URL</code> and{" "}
+              <code className="rounded bg-blue-100 px-1">VITE_SUPABASE_ANON_KEY</code> in Vercel to override defaults.
+            </p>
+          </div>
+        )}
         {!isSupabaseConfigured && (
           <div className="mt-8 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-800">
-            Demo note: without VITE_SUPABASE_URL, progress and unlocks use local storage only.
+            <p className="font-bold text-amber-900">Demo mode — Supabase is not connected on this deployment.</p>
+            <p className="mt-2">
+              Vercel must have these exact variable names, then you must <strong>Redeploy</strong> (Vite only reads
+              them at build time):
+            </p>
+            <ul className="mt-3 list-inside list-disc space-y-1">
+              <li>
+                <code className="rounded bg-amber-100 px-1">VITE_SUPABASE_URL</code> —{" "}
+                {supabaseStatus.hasUrl ? "detected" : "missing"}
+              </li>
+              <li>
+                <code className="rounded bg-amber-100 px-1">VITE_SUPABASE_ANON_KEY</code> —{" "}
+                {supabaseStatus.hasAnonKey ? "detected" : "missing"}
+              </li>
+            </ul>
+            <p className="mt-3">
+              Vercel → project <strong>skillwrite13</strong> → Settings → Environment Variables → check{" "}
+              <strong>Production</strong> → Deployments → Redeploy (uncheck “Use existing build cache” if offered).
+            </p>
           </div>
         )}
       </section>
@@ -158,6 +230,7 @@ export function LoginPage() {
             />
           </label>
 
+          {info && <p className="rounded-xl bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800">{info}</p>}
           {error && <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">{error}</p>}
 
           <button

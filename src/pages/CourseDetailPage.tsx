@@ -4,6 +4,7 @@ import { getEntitlementsEventName } from "../lib/entitlements";
 import { PaywallCard } from "../components/PaywallCard";
 import { getTrack } from "../data/tracks";
 import { isUnlocked } from "../lib/progress";
+import { isSupabaseConfigured } from "../lib/supabase";
 import type { CourseLesson, Program } from "../types";
 import { guidedLessonMinutes } from "../lib/lessonTime";
 import { compareCourseLessons } from "../lib/lessonNav";
@@ -159,7 +160,9 @@ export function CourseDetailPage() {
               <p className="text-sm font-bold uppercase tracking-widest text-blue-600">Choose access</p>
               <h2 className="mt-2 text-3xl font-bold text-slate-900">Unlock the course</h2>
               <p className="mt-3 text-slate-600">
-                This is a demo paywall. Purchases unlock locally in your browser so the full learning flow can be tested.
+                {isSupabaseConfigured
+                  ? "One-time purchase via Stripe. Access is tied to your SkillWrite account."
+                  : "Demo paywall: purchases unlock in this browser only for testing."}
               </p>
             </div>
             <div className="grid gap-6 lg:grid-cols-3">
