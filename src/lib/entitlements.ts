@@ -1,5 +1,4 @@
 import type { PurchaseTier } from "../types";
-import { AUTH_EVENT, getCurrentUser } from "./auth";
 import { isSupabaseConfigured, supabase } from "./supabase";
 
 export type EntitlementRow = {
@@ -46,7 +45,12 @@ export async function refreshEntitlements(): Promise<void> {
     return;
   }
 
-  if (!getCurrentUser()) {
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
     rows = [];
     loaded = true;
     notify();
@@ -82,10 +86,4 @@ export function clearEntitlementsCache(): void {
   rows = [];
   loaded = false;
   notify();
-}
-
-if (typeof window !== "undefined") {
-  window.addEventListener(AUTH_EVENT, () => {
-    void refreshEntitlements();
-  });
 }
